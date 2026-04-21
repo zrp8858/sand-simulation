@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QImage, QPainter
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget
 
@@ -10,10 +10,6 @@ class SandGrid:
         self.width = width
         self.height = height
         self.grid = np.zeros((height, width), dtype=np.uint8)
-
-        # spawn line at top
-        for x in range(width):
-            self.grid[0, x] = 1
 
     def update_grid(self):
         for y in range(self.height - 2, -1, -1):
@@ -40,8 +36,13 @@ class SandGrid:
 class SandWidget(QWidget):
     def __init__(self, width, height):
         super().__init__()
-        self.width = width
-        self.height = height
+        self.cell_size = 10
+        self.grid_width = width
+        self.grid_height = height
+        self.setFixedSize(
+            self.grid_width * self.cell_size,
+            self.grid_height * self.cell_size
+        )
         self.sand_grid = SandGrid(width, height)
         self.timer = QTimer()
         self.timer.timeout.connect(self.tick)
@@ -51,19 +52,35 @@ class SandWidget(QWidget):
         self.sand_grid.update_grid()
         self.update()
 
+    def add_sand(self, event):
+        x = event.x() // self.cell_size
+        y = event.y() // self.cell_size
+
+        if 0 <= x < self.sand_grid.width and 0 <= y < self.sand_grid.height:
+            self.sand_grid.grid[y, x] = 1
+
+    def mousePressEvent(self, event):
+        self.add_sand(event)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.LeftButton:
+            self.add_sand(event)
+
     def paintEvent(self, event):
         painter = QPainter(self)
 
-        rgb = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        rgb = np.zeros((self.grid_height, self.grid_width, 3), dtype=np.uint8)
 
         rgb[self.sand_grid.grid == 1] = [189, 149, 3]
         rgb[self.sand_grid.grid == 0] = [30, 30, 30]
 
+        self._rgb = rgb
+
         image = QImage(
-            rgb.data,
-            self.width,
-            self.height,
-            3 * self.width,
+            self._rgb.data,
+            self.grid_width,
+            self.grid_height,
+            3 * self.grid_width,
             QImage.Format_RGB888
         )
 
@@ -76,7 +93,7 @@ class MainWindow(QMainWindow):
 
         # Initialize window
         self.setWindowTitle("Sand Simulation")
-        self.setGeometry(0, 0, 2000, 2000)
+        self.setGeometry(0, 0, 500, 500)
 
         # Set up the sand widget
         self.sand_widget = SandWidget(50, 50)
